@@ -4,6 +4,7 @@ Docker build for creating a local Drupal 8 website running on a LEMP stack with 
 
 ### Install Drupal using Composer
 Adding COMPOSER_MEMORY_LIMIT=-1 to the beginning of the command helps to avoid composer memory limit issues. Change the version number to the version of Drupal you need to use.
+
 ``` COMPOSER_MEMORY_LIMIT=-1 composer create-project drupal/recommended-project:8.9.6 drupal ```
 
 ### Start up the Containers
@@ -11,6 +12,7 @@ Adding COMPOSER_MEMORY_LIMIT=-1 to the beginning of the command helps to avoid c
 
 ### Access Site
 ``` https://localhost ```
+
 (or at the custom URL that you create using the instructions in the comments near the https-portal container :wink:)
 
 ### Access PHPMyAdmin
