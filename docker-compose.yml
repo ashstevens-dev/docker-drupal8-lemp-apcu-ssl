@@ -1,0 +1,120 @@
+# put the compose file format version here that corresponds to your version
+# of docker engine found here: https://docs.docker.com/compose/compose-file/
+version: '3.8'
+
+services:
+
+    # create a database container with the latest image for MySQL
+    db:
+      image: mysql:8.0.21
+      # if the container should fail, ensure it gets started up again
+      restart: always
+      # create a volume mysql-data and map it to the file path that MySQL requires
+      volumes:
+        - ./mysql-data:/var/lib/mysql
+      environment:
+        MYSQL_ROOT_PASSWORD: drupalrootpw
+        MYSQL_DATABASE: drupal
+        MYSQL_USER: drupal
+        MYSQL_PASSWORD: drupal
+      # the first number (docker port) can be whatever you'd like and it's mapped to the
+      # 3306 port (container port), required by MySQL
+      ports:
+        - "3306:3306"
+
+    # create a PHPMyAdmin container so you can have a GUI for the DB; pull the latest image
+    pma:
+      image: phpmyadmin/phpmyadmin:5.0.1
+      # if the container should fail, ensure it gets started up again
+      restart: always
+      # the container will not function correctly without the db container running first, so
+      # make it dependent on the db container
+      depends_on:
+        - db
+      environment:
+        # this should reference the db container
+        PMA_HOST: db
+        # should match the MySQL one
+        MYSQL_ROOT_PASSWORD: drupalrootpw 
+      # set the first number to what you'd like; it's what you'll put at the end of the URL
+      # to access it (e.g. localhost:8081). 80 is the port that PMA requires.
+      ports:
+        - "8081:80"
+
+    # create the D8/PHP container; The image in the build uses PHP 7.4 with PHP-FPM, which is
+    # a processor that NGINX relies on for the processing of PHP files, as it doesn't have that
+    # functionality built in like Apache has. The Dockerfile adds APCu caching to the image.
+    php:
+      build: ./docker/php
+      # this container needs to have the db container running first, so make it dependent on it
+      depends_on:
+        - db
+      # if the container should fail, ensure it gets started up again
+      restart: always
+      # create a php ini file to set the proper restrictions on file uploads and other server settings
+      # and specify where it's stored; create the volumes for D8 and map them to the required file
+      # paths on /var/www/html
+      volumes:
+        - ./php-uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+        - ./drupal/web/modules:/var/www/html/modules
+        - ./drupal/web/profiles:/var/www/html/profiles
+        - ./drupal/web/sites:/var/www/html/sites
+        - ./drupal/web/themes:/var/www/html/themes
+      environment:
+        # host should match the db container's values (container name:port number)
+        # use these two values when going through the Drupal install
+        DRUPAL_DB_HOST: db:3306
+        # the user and pass should match the MySQL ones
+        DRUPAL_DB_USER: drupal
+        DRUPAL_DB_PASSWORD: drupal
+
+    # create the nginx web server container using the latest image from Docker Hub
+    web:
+      image: nginx
+      # the D8/db container needs to be running first, so make the container dependent on it
+      depends_on:
+        - php
+      # if the container should fail, ensure it gets started up again
+      restart: always
+      volumes:
+        # map the config file to the required file path
+        - ./nginx.conf:/etc/nginx/conf.d/default.conf
+        # map the drupal volume to the required file path
+        - ./drupal/web:/var/www/html
+        # create a logs directory and map to the required file path
+        - ./logs:/var/log/nginx
+
+    # create an https-portal using the latest image from Docker Hub
+    https-portal:
+      image: steveltn/https-portal:1
+      # nginx needs to be running first, so make the container dependent on it
+      depends_on:
+        - web
+      # the letsencrypt https-portal image needs ports 80 and 443; this exposes the ports from
+      # docker containers to the host system
+      ports:
+        - "80:80"
+        - "443:443"
+      # if the container should fail, ensure it gets started up again
+      restart: always
+      # create a directory to store the certs created between runs, to save on CPU processing
+      volumes:
+        - ./ssl_certs:/var/lib/https-portal
+      environment:
+        # you can use a custom domain for your local build and replace localhost below
+        # with it. Follow this tutorial to set it up:
+        # https://www.stevenrombauts.be/2018/01/use-dnsmasq-instead-of-etc-hosts/
+        # to get past the insecure warnings in Chrome type: thisisunsafe with your
+        # keyboard while on the webpage and the browser will refresh and bring up the site.
+        # This forwards the domain to the nginx container at port 80; flagged with local to tell
+        # https-portal that a self-signed certificate is needed (change to staging or
+        # production to get an actual cert from Lets Encrypt when you're in those stages
+        # of development)
+        DOMAINS: 'localhost -> http://web:80 #local'
+        # set the max file upload size here for nginx too (in addition to using the ini file)
+        CLIENT_MAX_BODY_SIZE: 64M
+
+# the db volume is a named volume (mysql-data) so it must be specified in the top-level of
+# this file here; this allows it to be reused across multiple services
+volumes:
+    mysql-data:
