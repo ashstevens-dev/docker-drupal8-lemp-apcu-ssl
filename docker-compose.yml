@@ -6,7 +6,7 @@ services:
 
     # create a database container with the latest image for MySQL
     db:
-      image: mysql:8.0.21
+      image: mariadb:10.5
       # if the container should fail, ensure it gets started up again
       restart: always
       # create a volume mysql-data and map it to the file path that MySQL requires
