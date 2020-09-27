@@ -84,6 +84,13 @@ services:
         # create a logs directory and map to the required file path
         - ./logs:/var/log/nginx
 
+    # create a container to handle SMTP
+    mailhog:
+      image: mailhog/mailhog:v1.0.1
+      ports:
+        - "1025:1025"
+        - "8025:8025"
+
     # create an https-portal using the latest image from Docker Hub
     https-portal:
       image: steveltn/https-portal:1
